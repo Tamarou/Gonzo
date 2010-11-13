@@ -5,7 +5,6 @@ with qw( Gonzo::DataObject );
 has external_id => (
     is          => 'ro',
     isa         => 'Int',
-    required    => 1,
 );
 
 has title => (
