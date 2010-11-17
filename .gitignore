@@ -3,3 +3,4 @@ morgue/
 blib/
 t/data/
 .build/
+*.gz
