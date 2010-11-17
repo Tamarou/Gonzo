@@ -29,5 +29,30 @@ __PACKAGE__->set_primary_key('id');
 
 __PACKAGE__->kiokudb_column('metadata');
 
+=head1 METHODS
+
+=head2 B<average_rating()>
+
+Retrieve the average user rating for this item.
+
+B<Arguments>: [none]
+
+B<Returns>: A float representing the raw aggregate average rating for this item.
+
+=cut
+
+sub average_rating {
+    my $self = shift;
+    my $data = $self->result_source->schema->resultset('Rating')->search(
+        { item_id => $self->id },
+        {
+            '+select' => [ { avg => 'rating', -as => 'average_rating' } ],
+            '+as' => qw/average_rating/,
+        }
+    )->single;
+
+    return $data->get_column('average_rating') || '0';
+}
+
 1;
 
