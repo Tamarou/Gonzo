@@ -24,6 +24,12 @@ has data_dir => (
     lazy_build  => 1,
 );
 
+has db_args => (
+    is          => 'ro',
+    isa         => 'HashRef',
+    default     => sub { {} },
+);
+
 has db_dsn_memory => (
     is          => 'ro',
     isa         => 'Str',
@@ -52,16 +58,27 @@ sub _build_db_dsn_persistent {
 sub _build_database {
     my $self = shift;
 
-    my $db = undef;
-    if ($self->is_persistent) {
-        $db = Gonzo::Database->new( dsn => $self->db_dsn_persistent );
-    }
-    else {
-        $db = Gonzo::Database->new( dsn => $self->db_dsn_memory );
+    my $args = $self->db_args;
+
+    my $boostrap = undef;
+
+    my $bootstrap = delete $args->{bootstrap} if exists $args->{bootstrap};
+
+    unless (defined( $args->{dsn} )) {
+        if ($self->is_persistent) {
+            $args->{dsn} = $self->db_dsn_persistent;
+        }
+        else {
+            $args->{dsn} = $self->db_dsn_memory;
+            $bootstrap = 1;
+        }
     }
 
-    # XXX: I'm sure I'll be revisiting this
-    $db->get_schema->deploy({ add_drop_table => 1 });
+    my $db = Gonzo::Database->new( %{$args} );
+
+    if ( $bootstrap ) {
+        $db->get_schema->deploy({ add_drop_table => 1 });
+    }
     return $db;
 }
 
