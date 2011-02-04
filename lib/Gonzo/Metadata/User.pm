@@ -4,32 +4,43 @@ with qw( Gonzo::DataObject );
 
 has external_id => (
     is          => 'ro',
-    isa         => 'Int',
+    isa         => 'Str',
     required    => 1,
+);
+
+has username => (
+    is          => 'ro',
+    isa         => 'Str',
+
+);
+
+has cpan_id => (
+    is          => 'ro',
+    isa         => 'Str',
+
 );
 
 has gender => (
     is          => 'ro',
     isa         => 'Str',
-    required    => 1,
+
 );
 
 has zip_code => (
     is          => 'ro',
     isa         => 'Str',
-    required    => 1,
+
 );
 
 has age => (
     is          => 'ro',
     isa         => 'Int',
-    required    => 1,
+
 );
 
 has occupation => (
     is          => 'ro',
     isa         => 'Str',
-    required    => 1,
 );
 
 sub _build_dbix_source_name { 'User'; }

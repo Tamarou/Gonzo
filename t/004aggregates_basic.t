@@ -6,7 +6,7 @@ use lib "$FindBin::Bin/lib";
 use_ok('Gonzo::TestTemplate');
 use_ok('Gonzo::TestTemplate::FakeData');
 
-my $template = Gonzo::TestTemplate->new( persistent_data => 1);
+my $template = Gonzo::TestTemplate->new( persistent_data => 1, db_args => {bootstrap => 1});
 
 my $db = $template->database;
 my $schema = $db->get_schema;
