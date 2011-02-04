@@ -4,8 +4,6 @@ with qw( Gonzo::Common );
 use KiokuDB;
 
 use Data::Dumper;
-use Gonzo::Metadata::User;
-use Gonzo::Metadata::Item;
 use Gonzo::Exception;
 use Check::ISA;
 use Carp;
@@ -17,12 +15,24 @@ has kioku_dir => (
     lazy_build  => 1,
 );
 
-has fucking_kioku_scope => (
+has _kioku_scope => (
     is          => 'rw',
     isa         => 'KiokuDB::LiveObjects::Scope',
 );
 
 has dsn => (
+    is          => 'ro',
+    isa         => 'Str',
+    required    => 1,
+);
+
+has username => (
+    is          => 'ro',
+    isa         => 'Str',
+    required    => 1,
+);
+
+has password => (
     is          => 'ro',
     isa         => 'Str',
     required    => 1,
@@ -38,6 +48,8 @@ sub _build_kioku_dir {
     my $self = shift;
     my $kioku = KiokuDB->connect(
         $self->dsn,
+        user => $self->username,
+        password => $self->password,
         schema => 'Gonzo::Schema',
         RaiseError => 1,
         sqlite_use_immediate_transaction => 1,
@@ -56,7 +68,7 @@ sub _build_kioku_dir {
     );
 
     $self->log->debug('Database connection inititalized.');
-    $self->fucking_kioku_scope( $kioku->new_scope );
+    $self->_kioku_scope( $kioku->new_scope );
     return $kioku;
 }
 
@@ -126,7 +138,11 @@ B<Returns>: The newly created user metadata object.
 sub create_user {
     my $self = shift;
     my $args = shift;
-    return $self->create_object({ source_name => 'User', metadata => $args });
+    return $self->create_object({
+        source_name     => 'User',
+        metadata_class  => $self->user_metadata_class,
+        metadata        => $args,
+    });
 }
 
 =head2 B<create_item( $hash_ref )>
@@ -144,7 +160,11 @@ B<Returns>: The newly created item metadata object.
 sub create_item {
     my $self = shift;
     my $args = shift;
-    return $self->create_object({ source_name => 'Item', metadata => $args });
+    return $self->create_object({
+        source_name     => 'Item',
+        metadata_class  => $self->item_metadata_class,
+        metadata        => $args,
+    });
 }
 
 =head2 B<create_object( $hash_ref )>
@@ -157,7 +177,7 @@ This method accepts a single hash reference containing the the following key/val
 
 =over 4
 
-=item B<source_name>
+=item B<metadata_class>
 
 Required. The DBIx::Class resultsource name for the DBIC side of the hybrid object.
 
@@ -178,15 +198,15 @@ sub create_object {
     my $self = shift;
     my $args = shift;
 
-    unless ( defined($args->{source_name}) && defined $args->{metadata} ) {
-        Gonzo::Exception->throw("You must pass 'metadata' and 'source_name' keys to create_object.");
+    unless ( defined($args->{metadata_class}) && defined $args->{metadata} ) {
+        Gonzo::Exception->throw("You must pass 'metadata' and 'metadata_class' keys to create_object.");
     }
 
     my $meta = undef;
 
     $self->kioku_dir->txn_do(scope => 1, body => sub {
-            my $metaclass = 'Gonzo::Metadata::' . $args->{source_name};
-            $meta = $metaclass->new( %{$args->{metadata}} );
+            Class::MOP::load_class( $args->{metadata_class} );
+            $meta = $args->{metadata_class}->new( %{$args->{metadata}} );
 
             my $dbix_row = $self->get_schema->resultset($args->{source_name})->create({
                 metadata => $meta,
@@ -426,7 +446,7 @@ sub rate_item {
         $user_id = $args->{user_id};
     }
 
-    my $rating = $self->get_schema->resultset('Rating')->create({ item_id => $item_id, user_id => $user_id, rating => $args->{rating_value} });
+    my $rating = $self->get_schema->resultset('Rating')->find_or_create({ item_id => $item_id, user_id => $user_id, rating => $args->{rating_value} });
 
     # this probably shouldn't be here but having it here makes the
     # recommendations more-or-less realtime. XXX: Maybe a flag?
