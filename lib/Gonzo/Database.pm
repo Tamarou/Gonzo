@@ -23,7 +23,7 @@ has _kioku_scope => (
 has dsn => (
     is          => 'ro',
     isa         => 'Str',
-    required    => 1,
+    lazy_build  => 1,
 );
 
 has username => (
@@ -38,11 +38,43 @@ has password => (
     required    => 1,
 );
 
+has dbname => (
+    is          => 'ro',
+    isa         => 'Str',
+);
+
+has driver => (
+    is          => 'ro',
+    isa         => 'Str',
+);
+
+
+has host => (
+    is          => 'ro',
+    isa         => 'Str',
+    default     => sub { 'localhost' },
+    predicate   => 'has_host',
+);
+
+has port => (
+    is          => 'ro',
+    isa         => 'Str',
+    predicate   => 'has_port',
+);
+
 has bootstrap => (
     is          => 'ro',
     isa         => 'Bool',
     default     => sub { 0 },
 );
+
+sub _build_dsn {
+    my $self = shift;
+    my $dsn  = 'DBI:' . $self->driver . ':database=' . $self->dbname;
+    $dsn    .= ';host=' . $self->host if $self->has_host;
+    $dsn    .= ';port=' . $self->port if $self->has_port;
+    return $dsn;
+}
 
 sub _build_kioku_dir {
     my $self = shift;

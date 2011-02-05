@@ -14,23 +14,27 @@ GetOptions(
     'file=s'        => \$conf{config_file},
     'username=s'    => \$conf{username},
     'password=s'    => \$conf{password},
-    'database=s'    => \$conf{database},
+    'dbname=s'      => \$conf{dbname},
     'host=s'        => \$conf{password},
     'help'          => \$do_help,
 );
 
 usage() if $do_help;
+
+use Data::Dumper;
+
 my $conf_path = delete $conf{config_file};
 
 if ( $conf_path and -f $conf_path ) {
-    my $file_conf = Config::Any->load_files({
+    my $db_conf = Config::Any->load_files({
         use_ext         => 1,
         files           => [ $conf_path ],
-    })->[0]->{$conf_path};
+    })->[0]->{$conf_path}->{database};
 
-    foreach my $key ( keys %{$file_conf} ) {
+
+    foreach my $key ( keys %{$db_conf} ) {
         next if defined $conf{$key};
-        $conf{$key} = $file_conf->{$key};
+        $conf{$key} = $db_conf->{$key};
     }
 }
 
@@ -38,7 +42,6 @@ $conf{host} ||= 'localhost';
 
 my $db = Gonzo::Database->new(
     %conf,
-    dsn         => "DBI:mysql:database=$conf{database};host=$conf{host};",
     bootstrap   => 1,
 ) || die "Error connecting to database: $!";
 
