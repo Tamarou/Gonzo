@@ -29,18 +29,19 @@ has dsn => (
 has username => (
     is          => 'ro',
     isa         => 'Maybe[Str]',
-    #required    => 1,
+    predicate   => 'has_username',
 );
 
 has password => (
     is          => 'ro',
-    isa         => 'Str|Undef',
-    #required    => 1,
+    isa         => 'Maybe[Str]',
+    predicate   => 'has_password',
 );
 
 has dbname => (
     is          => 'ro',
     isa         => 'Str',
+    default     => sub { 'gonzodb' },
 );
 
 has driver => (
@@ -79,13 +80,16 @@ sub _build_dsn {
 sub _build_kioku_dir {
     my $self = shift;
 
-    warn "ZOMG " . $self->dsn . "\n";
+    my %optional_args = ();
+
+    # mostly to cover SQLite (which doesn't require any of these)
+    $optional_args{user}     = $self->username if $self->has_username;
+    $optional_args{password} = $self->password if $self->has_password;
+    $optional_args{create}   = 1 if $self->bootstrap;
+
     my $kioku = KiokuDB->connect(
         $self->dsn,
-        user => 'gonzo',
-        password => 'd@hut!',
-#         user => $self->username,
-#         password => $self->password,
+        %optional_args,
         schema => 'Gonzo::Schema',
         RaiseError => 1,
         sqlite_use_immediate_transaction => 1,
