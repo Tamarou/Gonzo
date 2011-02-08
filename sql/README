@@ -1,0 +1,3 @@
+The is sort of an experimental sandbox for useful queries.
+
+The overarching goal is to create a set of generalized aggregate tables, UDFs, etc that can be combined into more sophisticated recommendation logic.
