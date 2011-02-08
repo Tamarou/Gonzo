@@ -7,7 +7,7 @@ use Data::Dumper;
 use Gonzo::Exception;
 use Check::ISA;
 use Carp;
-BEGIN { $SIG{__DIE__} = sub { Carp::confess(@_) } }
+BEGIN { $SIG{__DIE__} = sub { Carp::confess($_[0]) } }
 
 has kioku_dir => (
     is          => 'ro',
@@ -28,14 +28,14 @@ has dsn => (
 
 has username => (
     is          => 'ro',
-    isa         => 'Str',
-    required    => 1,
+    isa         => 'Maybe[Str]',
+    #required    => 1,
 );
 
 has password => (
     is          => 'ro',
-    isa         => 'Str',
-    required    => 1,
+    isa         => 'Str|Undef',
+    #required    => 1,
 );
 
 has dbname => (
@@ -78,10 +78,14 @@ sub _build_dsn {
 
 sub _build_kioku_dir {
     my $self = shift;
+
+    warn "ZOMG " . $self->dsn . "\n";
     my $kioku = KiokuDB->connect(
         $self->dsn,
-        user => $self->username,
-        password => $self->password,
+        user => 'gonzo',
+        password => 'd@hut!',
+#         user => $self->username,
+#         password => $self->password,
         schema => 'Gonzo::Schema',
         RaiseError => 1,
         sqlite_use_immediate_transaction => 1,
@@ -89,7 +93,7 @@ sub _build_kioku_dir {
         create => $self->bootstrap ? 1 : undef,
         columns => [
             external_id => {
-                data_type => 'int',
+                data_type => 'varchar',
                 is_nullable => 1,
                 extract => sub {
                     my $obj = shift;

@@ -3,6 +3,8 @@ use Moose::Role;
 with qw(MooseX::Log::Log4perl);
 
 use Log::Log4perl qw(:easy);
+use Config::Path;
+use Data::Dumper;
 
 BEGIN {
     Log::Log4perl->easy_init();
@@ -11,13 +13,14 @@ BEGIN {
 has config => (
     isa         => 'Config::Path',
     is          => 'ro',
+    lazy        => 1,
+    builder     => '_build_config',
 );
 
-has database => (
+has config_file => (
+    isa         => 'Str',
     is          => 'ro',
-    isa         => 'Gonzo::Database',
-    lazy        => 1,
-    builder     => '_build_database',
+    predicate   => 'has_config_file',
 );
 
 has user_metadata_class => (
@@ -32,34 +35,11 @@ has item_metadata_class => (
     default     =>  sub { 'Gonzo::Metadata::Item' },
 );
 
-sub _build_database {
+sub _build_config {
     my $self = shift;
-
-    my $args = $self->config->fetch('/database');
-
-    die "ARGS " . Dumper( $args );
-    my $boostrap = undef;
-
-    my $bootstrap = delete $args->{bootstrap} if exists $args->{bootstrap};
-
-    unless (defined( $args->{dsn} )) {
-        if ($self->is_persistent) {
-            $args->{dsn} = $self->db_dsn_persistent;
-        }
-        else {
-            $args->{dsn} = $self->db_dsn_memory;
-            $bootstrap = 1;
-        }
-    }
-
-    my $db = Gonzo::Database->new( %{$args} );
-
-    if ( $bootstrap ) {
-        $db->get_schema->deploy({ add_drop_table => 1 });
-    }
-    return $db;
+    return undef unless $self->has_config_file;
+    return Config::Path->new( files => [ $self->config_file ] );
 }
 
-1;
 1;
 
