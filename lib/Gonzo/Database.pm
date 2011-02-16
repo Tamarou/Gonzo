@@ -490,7 +490,7 @@ sub rate_item {
 
     # this probably shouldn't be here but having it here makes the
     # recommendations more-or-less realtime. XXX: Maybe a flag?
-    $self->update_user_rating_aggregates({ rating => $rating });
+    #$self->update_user_rating_aggregates({ rating => $rating });
 
     return $rating;
 }
