@@ -87,8 +87,10 @@ sub _build_kioku_dir {
     $optional_args{password} = $self->password if $self->has_password;
     $optional_args{create}   = 1 if $self->bootstrap;
 
+    my $dsn = $self->dsn;
+
     my $kioku = KiokuDB->connect(
-        $self->dsn,
+        $dsn,
         %optional_args,
         schema => 'Gonzo::Schema',
         RaiseError => 1,
@@ -106,6 +108,12 @@ sub _build_kioku_dir {
             }
         ],
     );
+
+    if ( $dsn =~ /SQLite/ ) {
+        $self->log->debug('Loading additiona SQLite functions.');
+        Class::MOP::load_class('SQLite::More');
+        SQLite::More::sqlite_more( $kioku->backend->schema->storage->dbh );
+    }
 
     $self->log->debug('Database connection inititalized.');
     $self->_kioku_scope( $kioku->new_scope );
@@ -626,4 +634,125 @@ sub update_user_rating_aggregates {
     #});
     return 1; #$count;
 }
+
+=head2 B<update_item_statistics()>
+
+Updates the precalculated statistics for all items. Really just a placeholder pending a more surgical approach.
+
+B<Arguments>:
+
+None
+=over 4
+
+=back
+
+=cut
+
+sub update_item_statistics {
+    my $self = shift;
+
+    my $schema = $self->get_schema;
+
+    $schema->resultset('ItemStatistics')->delete;
+
+    $self->log->debug('Updating Item statistics.');
+
+    my $insert_result = $schema->storage->dbh_do( sub {
+            my ($storage, $dbh, %args) = @_;
+            $dbh->{RaiseError} = 1;
+            my $sql = qq|
+                insert into item_statistics (item_id, mean, count)
+                select item_id, sum(rating) / (select count(*) from items) mean, sum(1) count
+                from ratings r
+                group by r.item_id;
+            |;
+
+            my $sth = $dbh->prepare( $sql ) || die $dbh->errstr;
+            $sth->execute() || die $sth->errstr;
+        },
+    );
+
+    my $update_result = $schema->storage->dbh_do( sub {
+            my ($storage, $dbh, %args) = @_;
+            $dbh->{RaiseError} = 1;
+            my $sql = qq|
+                update item_statistics
+                set stddev = (
+                    select sqrt(
+                        sum(ratings.rating * ratings.rating) / (select count(*) from     users) - mean * mean ) stddev
+                    from ratings
+                    where ratings.item_id = item_statistics.item_id
+                    group by ratings.item_id
+                );
+            |;
+
+            my $sth = $dbh->prepare( $sql ) || Gonzo::Exception->throw( $dbh->errstr );
+            $sth->execute() || Gonzo::Exception->throw( $sth->errstr );
+        },
+    );
+
+    $self->log->debug('Item statistics updated.');
+
+    return 1;
+}
+
+=head2 B<update_item_correlations()>
+
+Updates the precalculated correlationss for all items. Really just a placeholder pending a more surgical approach.
+
+B<Arguments>:
+
+None
+=over 4
+
+=back
+
+=cut
+
+sub update_item_correlations {
+    my $self = shift;
+
+    my $schema = $self->get_schema;
+
+    $schema->resultset('ItemCorrelations')->delete;
+
+    $self->log->debug('Updating Item correlations.');
+
+    my $insert_result = $schema->storage->dbh_do( sub {
+            my ($storage, $dbh, %args) = @_;
+            $dbh->{RaiseError} = 1;
+            my $sql = qq|
+                insert into item_correlations (
+                    item_id_one,
+                    item_id_two,
+                    pearson
+                )
+                select sf.item_id_one,
+                    sf.item_id_two,
+                    (sf.sum / (select count(*) from users) - stats1.mean * stats2.mean) / (stats1.stddev * stats2.stddev) as 'wibble'
+                from (
+                    select  r1.item_id item_id_one,
+                        r2.item_id item_id_two,
+                        sum(r1.rating * r2.rating) sum
+                    from ratings r1
+                    join ratings r2
+                    on r1.user_id = r2.user_id
+                    group by item_id_one, item_id_two
+                ) sf
+                join item_statistics stats1
+                on stats1.item_id = sf.item_id_one
+                join item_statistics stats2
+                on stats2.item_id = sf.item_id_two
+                where stats1.item_id <> stats2.item_id;
+            |;
+
+            my $sth = $dbh->prepare( $sql ) || die $dbh->errstr;
+            $sth->execute() || die $sth->errstr;
+        },
+    );
+    $self->log->debug('Item crrelations updated.');
+
+    return 1;
+}
+
 1;

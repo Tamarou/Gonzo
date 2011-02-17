@@ -165,7 +165,8 @@ sub import_data {
         $stats->{ratings}++;
     }
 
-###
+    $db->update_item_statistics;
+    $db->update_item_correlations;
     return $stats;
 }
 
