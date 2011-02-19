@@ -15,13 +15,11 @@ GetOptions(
     'username=s'    => \$conf{username},
     'password=s'    => \$conf{password},
     'dbname=s'      => \$conf{dbname},
-    'host=s'        => \$conf{password},
+    'host=s'        => \$conf{host},
     'help'          => \$do_help,
 );
 
 usage() if $do_help;
-
-use Data::Dumper;
 
 my $conf_path = delete $conf{config_file};
 

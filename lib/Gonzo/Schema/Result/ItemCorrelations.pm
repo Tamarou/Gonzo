@@ -33,11 +33,11 @@ __PACKAGE__->add_columns(
 	},
 );
 
-__PACKAGE__->set_primary_key(qw(item_id_one item_id_two));
+__PACKAGE__->add_unique_constraints([ qw/item_id_one item_id_two/ ]);
 
-__PACKAGE__->belongs_to('item_one' => 'Gonzo::Schema::Result::Item', 'item_id_one');
+#__PACKAGE__->belongs_to('item_one' => 'Gonzo::Schema::Result::Item', 'item_id_one');
 
-__PACKAGE__->belongs_to('item_two' => 'Gonzo::Schema::Result::Item', 'item_id_two');
+#__PACKAGE__->belongs_to('item_two' => 'Gonzo::Schema::Result::Item', 'item_id_two');
 
 sub sqlt_deploy_hook {
     my ($self, $sqlt_table) = @_;
