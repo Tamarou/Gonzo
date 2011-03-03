@@ -698,7 +698,7 @@ sub update_item_statistics {
 
 =head2 B<update_item_correlations()>
 
-Updates the precalculated correlationss for all items. Really just a placeholder pending a more surgical approach.
+Updates the precalculated correlations for all items. Really just a placeholder pending a more surgical approach.
 
 B<Arguments>:
 
@@ -750,9 +750,131 @@ sub update_item_correlations {
             $sth->execute() || die $sth->errstr;
         },
     );
-    $self->log->debug('Item crrelations updated.');
+    $self->log->debug('Item correlations updated.');
 
     return 1;
 }
 
+###
+=head2 B<update_user_statistics()>
+
+Updates the precalculated statistics for all users. Really just a placeholder pending a more surgical approach.
+
+B<Arguments>:
+
+None
+=over 4
+
+=back
+
+=cut
+
+sub update_user_statistics {
+    my $self = shift;
+
+    my $schema = $self->get_schema;
+
+    $schema->resultset('UserStatistics')->delete;
+
+    $self->log->debug('Updating User statistics.');
+
+    my $insert_result = $schema->storage->dbh_do( sub {
+            my ($storage, $dbh, %args) = @_;
+            $dbh->{RaiseError} = 1;
+            my $sql = qq|
+                insert into user_statistics (user_id, mean, count)
+                select user_id, sum(rating) / (select count(*) from items) mean, sum(1) count
+                from ratings r
+                group by r.user_id;
+            |;
+
+            my $sth = $dbh->prepare( $sql ) || die $dbh->errstr;
+            $sth->execute() || die $sth->errstr;
+        },
+    );
+
+    my $update_result = $schema->storage->dbh_do( sub {
+            my ($storage, $dbh, %args) = @_;
+            $dbh->{RaiseError} = 1;
+            my $sql = qq|
+                update user_statistics
+                set stddev = (
+                    select sqrt(
+                        sum(ratings.rating * ratings.rating) / (select count(*) from items) - user_statistics.mean * user_statistics.mean
+                    ) stddev
+                    from ratings
+                    where ratings.user_id = user_statistics.user_id
+                    group by ratings.user_id
+                );
+            |;
+
+            my $sth = $dbh->prepare( $sql ) || Gonzo::Exception->throw( $dbh->errstr );
+            $sth->execute() || Gonzo::Exception->throw( $sth->errstr );
+        },
+    );
+
+    $self->log->debug('Item statistics updated.');
+
+    return 1;
+}
+
+=head2 B<update_user_correlations()>
+
+Updates the precalculated correlations for all users. Really just a placeholder pending a more surgical approach.
+
+B<Arguments>:
+
+None
+=over 4
+
+=back
+
+=cut
+
+sub update_item_correlations {
+    my $self = shift;
+
+    my $schema = $self->get_schema;
+
+    $schema->resultset('UserCorrelations')->delete;
+
+    $self->log->debug('Updating User correlations.');
+
+    my $insert_result = $schema->storage->dbh_do( sub {
+            my ($storage, $dbh, %args) = @_;
+            $dbh->{RaiseError} = 1;
+            my $sql = qq|
+                insert into user_correlations (
+                    user_id_one,
+                    user_id_two,
+                    pearson
+                )
+                select sf.user_id_one, sf.user_id_two, sf.sumsqr2 - ( sf.sum1 * sf.sum2 / sf.count) /
+                sqrt(( sf.sumsqr1 - pow(sf.sum1, 2) / sf.count ) * ( sf.sumsqr2 - pow(sf.sum2, 2) / sf.count )) pearson
+                from (
+                    select  r1.user_id user_id_one,
+                            r2.user_id user_id_two,
+                            sum(1) count,
+                            sum(r1.rating) sum1,
+                            sum(r2.rating) sum2,
+                            sum(pow(r1.rating,2)) sumsqr1,
+                            sum(pow(r2.rating,2)) sumsqr2,
+                            sum(r1.rating * r2.rating) p_sum,
+                            sum(r1.rating + r2.rating) sum
+                    from ratings r1
+                    join ratings r2 on r1.item_id = r2.item_id
+                    where r1.user_id <> r2.user_id
+                    group by user_id_one, user_id_two
+                ) sf;
+            |;
+
+            my $sth = $dbh->prepare( $sql ) || die $dbh->errstr;
+            $sth->execute() || die $sth->errstr;
+        },
+    );
+    $self->log->debug('Item correlations updated.');
+
+    return 1;
+}
+###
 1;
