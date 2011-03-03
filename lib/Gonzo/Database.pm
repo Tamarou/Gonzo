@@ -872,7 +872,7 @@ sub update_item_correlations {
             $sth->execute() || die $sth->errstr;
         },
     );
-    $self->log->debug('Item correlations updated.');
+    $self->log->debug('User correlations updated.');
 
     return 1;
 }
