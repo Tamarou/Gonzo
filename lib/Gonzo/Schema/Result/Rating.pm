@@ -46,5 +46,18 @@ __PACKAGE__->set_primary_key(qw(user_id item_id));
 __PACKAGE__->belongs_to('item' => 'Gonzo::Schema::Result::Item', 'item_id');
 __PACKAGE__->belongs_to('user' => 'Gonzo::Schema::Result::User', 'user_id');
 
+sub sqlt_deploy_hook {
+    my ($self, $sqlt_table) = @_;
+
+    $sqlt_table->add_index(
+        name => 'idx_ratings_item_id',
+        fields => ['item_id']
+    );
+    $sqlt_table->add_index(
+        name => 'idx_ratings_user_id',
+        fields => ['user_id']
+    );
+}
+
 1;
 
