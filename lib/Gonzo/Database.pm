@@ -3,11 +3,11 @@ use Moose;
 with qw( Gonzo::Common );
 use KiokuDB;
 
-use Data::Dumper;
+use Data::Dumper::Concise;
 use Gonzo::Exception;
 use Check::ISA;
 use Carp;
-BEGIN { $SIG{__DIE__} = sub { Carp::confess($_[0]) } }
+BEGIN { $SIG{__DIE__} = sub { Carp::confess(@_) } }
 
 has kioku_dir => (
     is          => 'ro',
@@ -66,7 +66,13 @@ has port => (
 has bootstrap => (
     is          => 'ro',
     isa         => 'Bool',
-    default     => sub { 0 },
+    default     => 0,
+);
+
+has similarity_factory => (
+    is          => 'ro',
+    isa         => 'Gonzo::SimilarityFactory',
+    required    => 1,
 );
 
 sub _build_dsn {
@@ -74,7 +80,7 @@ sub _build_dsn {
     my $dsn  = 'DBI:' . $self->driver . ':database=' . $self->dbname;
     $dsn    .= ';host=' . $self->host if $self->has_host;
     $dsn    .= ';port=' . $self->port if $self->has_port;
-    return $dsn . ';mysql_connect_timeout=56000';
+    return $dsn;
 }
 
 sub _build_kioku_dir {
@@ -89,15 +95,21 @@ sub _build_kioku_dir {
 
     my $dsn = $self->dsn;
 
+    $self->log->debug('About to connect ');
+
+    my $sim = $self->similarity_factory;
+
     my $kioku = KiokuDB->connect(
         $dsn,
         %optional_args,
         schema => 'Gonzo::Schema',
-        RaiseError => 1,
+        schema_hook => sub {
+            my $self = shift;
+            my $schema = shift;
+            $schema->similarity_factory($sim);
+        },
         sqlite_use_immediate_transaction => 1,
-        mysql_connect_timeout => 999999,
         debug => 1,
-        create => $self->bootstrap ? 1 : undef,
         columns => [
             external_id => {
                 data_type => 'varchar',
@@ -111,7 +123,7 @@ sub _build_kioku_dir {
     );
 
     if ( $dsn =~ /SQLite/ ) {
-        $self->log->debug('Loading additiona SQLite functions.');
+        $self->log->debug('Loading additional SQLite functions.');
         Class::MOP::load_class('SQLite::More');
         SQLite::More::sqlite_more( $kioku->backend->schema->storage->dbh );
     }
@@ -136,6 +148,7 @@ B<Returns>: The DBIx::Class::Schema object at the heart of Gonzo's data storage.
 sub get_schema {
     return shift->kioku_dir->backend->schema;
 }
+
 
 =head2 B<create_rating( $hash_ref )>
 
@@ -710,7 +723,7 @@ None
 
 =cut
 
-sub update_item_correlations {
+sub ___update_item_correlations {
     my $self = shift;
 
     my $schema = $self->get_schema;
@@ -756,17 +769,11 @@ sub update_item_correlations {
     return 1;
 }
 
-###
 =head2 B<update_user_statistics()>
 
 Updates the precalculated statistics for all users. Really just a placeholder pending a more surgical approach.
 
-B<Arguments>:
-
-None
-=over 4
-
-=back
+B<Arguments>: [None]
 
 =cut
 
@@ -821,7 +828,7 @@ sub update_user_statistics {
 
 =head2 B<update_user_correlations()>
 
-Updates the precalculated correlations for all users. Really just a placeholder pending a more surgical approach.
+Updates the precalculated correlations for all users.
 
 B<Arguments>:
 
@@ -834,53 +841,47 @@ None
 
 sub update_user_correlations {
     my $self = shift;
-
     my $schema = $self->get_schema;
 
-    $schema->resultset('UserCorrelations')->delete;
-
-
-
-    $self->log->debug('Updating User correlations.');
-
-    my $insert_result = $schema->storage->dbh_do( sub {
-            my ($storage, $dbh, %args) = @_;
-            $dbh->{RaiseError} = 1;
-            my $sql = qq|
-                insert into user_correlations (
-                    user_id_one,
-                    user_id_two,
-                    pearson
-                )
-                select sf.user_id_one, sf.user_id_two, (sf.sumsqr2 - ( sf.sum1 * sf.sum2 / sf.count) /
-                sqrt(( sf.sumsqr1 - pow(sf.sum1, 2) / sf.count ) * ( sf.sumsqr2 - pow(sf.sum2, 2) / sf.count ))) pearson
-                from (
-                    select  r1.user_id user_id_one,
-                            r2.user_id user_id_two,
-                            sum(1) count,
-                            sum(r1.rating) sum1,
-                            sum(r2.rating) sum2,
-                            sum(pow(r1.rating,2)) sumsqr1,
-                            sum(pow(r2.rating,2)) sumsqr2,
-                            sum(r1.rating * r2.rating) p_sum,
-                            sum(r1.rating + r2.rating) sum
-                    from ratings r1
-                    join ratings r2 on r1.item_id = r2.item_id
-                    where r1.user_id <> r2.user_id
-                    group by user_id_one, user_id_two
-                ) sf;
-            |;
-
-            $dbh->do( $sql ) || Gonzo::Exception->throw( $dbh->errstr );
-
-            #my $sth = $dbh->prepare( $sql ) || die $dbh->errstr;
-            #$sth->execute() || die $sth->errstr;
-        },
-    );
-
+    my $map = $self->similarity_factory->similarity_classes;
+    foreach my $key ( keys ( %{$map} )) {
+        my $sim = $map->{$key};
+        next unless $sim->can('update_user_correlations');
+        my $column_name = $sim->column_name;
+        $self->log->debug("Processing correlations for '$column_name'");
+        $sim->update_user_correlations( $schema );
+        $self->log->debug('Done');
+    }
     $self->log->debug('User correlations updated.');
-
-    return 1;
 }
-###
+
+=head2 B<update_item_correlations()>
+
+Updates the precalculated correlations for all items.
+
+B<Arguments>:
+
+None
+=over 4
+
+=back
+
+=cut
+
+sub update_item_correlations {
+    my $self = shift;
+    my $schema = $self->get_schema;
+
+    my $map = $self->similarity_factory->similarity_classes;
+    foreach my $key ( keys ( %{$map} )) {
+        my $sim = $map->{$key};
+        next unless $sim->can('update_item_correlations');
+        my $column_name = $sim->column_name;
+        $self->log->debug("Processing Item correlations for '$column_name'");
+        $sim->update_item_correlations( $schema );
+        $self->log->debug('Done');
+    }
+    $self->log->debug('Item correlations updated.');
+}
+
 1;

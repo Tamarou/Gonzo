@@ -46,16 +46,24 @@ __PACKAGE__->set_primary_key(qw(user_id item_id));
 __PACKAGE__->belongs_to('item' => 'Gonzo::Schema::Result::Item', 'item_id');
 __PACKAGE__->belongs_to('user' => 'Gonzo::Schema::Result::User', 'user_id');
 
+=head1 METHODS
+
+=head2 B<sqlt_deploy_hook>
+
+Internal use only. Deployment hook for adding specialized indexes.
+
+=cut
+
 sub sqlt_deploy_hook {
-    my ($self, $sqlt_table) = @_;
+    my ($class, $sqlt_table) = @_;
 
     $sqlt_table->add_index(
         name => 'idx_ratings_item_id',
-        fields => ['item_id']
+        fields => ['item_id'],
     );
     $sqlt_table->add_index(
         name => 'idx_ratings_user_id',
-        fields => ['user_id']
+        fields => ['user_id'],
     );
 }
 

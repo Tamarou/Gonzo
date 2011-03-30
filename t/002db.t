@@ -10,6 +10,8 @@ my $template = Gonzo::TestTemplate->new;
 # defaults to in-memory storage
 my $db = Gonzo::Database->new(
     dsn => $template->db_dsn_memory,
+    similarity_factory => $template->similarity_pearson,
+    bootstrap => 1,
 );
 
 ok( $db, "Database created" );

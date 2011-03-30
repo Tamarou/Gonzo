@@ -4,21 +4,21 @@ use FindBin;
 use Data::Dumper;
 use lib "$FindBin::Bin/lib";
 use_ok('Gonzo::TestTemplate');
-use_ok('Gonzo::Database');
 
-my $template = Gonzo::TestTemplate->new;
+my $template = Gonzo::TestTemplate->new( persistent_data => 0 );
 
-# defaults to in-memory storage
-my $db = Gonzo::Database->new(
-    dsn => $template->db_dsn_memory,
-);
+my $gonzo = $template->new_gonzo;
+
+ok( $gonzo, "Gonzo object created." );
+
+my $db = $gonzo->database;
 
 ok( $db, "Database created" );
 isa_ok( $db, 'Gonzo::Database', 'DB object is what we expect.');
 
 my $schema = $db->get_schema;
 
-$schema->deploy({ add_drop_table => 1 });
+ok( $schema );
 
 my $user_data = {
     external_id => 1313,
@@ -123,34 +123,11 @@ my $rating2 = $db->rate_item({ user => $user_meta, item => $item2_meta, rating_v
 
 ok( $rating2, 'Second Rating created.');
 
-cmp_ok( $aggregate_rs->search({})->count, '==', 2, 'Two rating aggregates added.');
+$db->update_item_statistics;
+$db->update_item_correlations;
+$db->update_user_statistics;
+$db->update_user_correlations;
+
+#cmp_ok( $aggregate_rs->search({})->count, '==', 2, 'Two rating aggregates added.');
 
 done_testing();
-
-=cut
-
-# check that the tables were created and the resultsets work
-
-my $entries_rs = $schema->resultset('entries');
-ok( $entries_rs, "KiokuDB 'entries' resultset fetched" );
-isa_ok( $entries_rs, 'DBIx::Class::ResultSet', "KiokuDB 'entries' resultset object is what we expect.");
-
-my $user_rs = $schema->resultset('User');
-ok( $user_rs, "Users resultset fetched" );
-isa_ok( $user_rs, 'DBIx::Class::ResultSet', "User resultset object is what we expect.");
-
-my $item_rs = $schema->resultset('Item');
-ok( $item_rs, "Item resultset fetched" );
-isa_ok( $item_rs, 'DBIx::Class::ResultSet', "Item resultset object is what we expect.");
-
-my $rating_rs = $schema->resultset('Rating');
-ok( $rating_rs, "Rating resultset fetched" );
-isa_ok( $rating_rs, 'DBIx::Class::ResultSet', "Rating resultset object is what we expect.");
-
-my $aggregate_rs = $schema->resultset('RatingAggregate');
-ok( $aggregate_rs, "Rating Agrregate resultset fetched" );
-isa_ok( $aggregate_rs, 'DBIx::Class::ResultSet', "User resultset object is what we expect.");
-
-done_testing();
-
-
