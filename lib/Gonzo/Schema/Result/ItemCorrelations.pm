@@ -29,9 +29,9 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->add_unique_constraints([ qw/item_id_one item_id_two/ ]);
 
-#__PACKAGE__->belongs_to('item_one' => 'Gonzo::Schema::Result::Item', 'item_id_one');
+__PACKAGE__->belongs_to('item_one' => 'Gonzo::Schema::Result::Item', 'item_id_one');
 
-#__PACKAGE__->belongs_to('item_two' => 'Gonzo::Schema::Result::Item', 'item_id_two');
+__PACKAGE__->belongs_to('item_two' => 'Gonzo::Schema::Result::Item', 'item_id_two');
 
 =head1 METHODS
 
@@ -55,14 +55,14 @@ sub sqlt_deploy_hook {
         $sqlt_table->add_field( %$column_info );
     }
 
-    $sqlt_table->add_index(
-        name => 'idx_item_correlations_item_id_one',
-        fields => ['item_id_one']
-    );
-    $sqlt_table->add_index(
-        name => 'idx_item_correlations_item_id_two',
-        fields => ['item_id_two']
-    );
+#     $sqlt_table->add_index(
+#         name => 'idx_item_correlations_item_id_one',
+#         fields => ['item_id_one']
+#     );
+#     $sqlt_table->add_index(
+#         name => 'idx_item_correlations_item_id_two',
+#         fields => ['item_id_two']
+#     );
 }
 
 
