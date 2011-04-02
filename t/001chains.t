@@ -35,7 +35,7 @@ isa_ok( $items_rs, 'DBIx::Class::ResultSet', 'Items resultset fetched via item c
 
 isa_ok( $items_rs->first, 'Gonzo::Schema::Result::Item', 'Returned Items via item correleations rs filter.');
 
-my $ranked_ic_rs = $ic_rs->ranked('pearson');
+my $ranked_ic_rs = $ic_rs->ranked_by('pearson');
 
 ok( $ranked_ic_rs, 'Ranked IC resultset fetched.' );
 
@@ -58,7 +58,7 @@ ok( $random_item, 'Pulled an Item at random.');
 
 # this is the meat.
 
-my $related_items_rs = $ic_rs->search({ item_id_one => $random_item->id })->ranked('pearson')->items_rs;
+my $related_items_rs = $ic_rs->search({ item_id_one => $random_item->id })->ranked_by('pearson')->items_rs;
 
 ok( $related_items_rs, 'Related items resultset fetched.' );
 
@@ -79,7 +79,7 @@ ok( $users_rs->isa('DBIx::Class::ResultSet'), 'Correct user resultset class fetc
 
 isa_ok( $users_rs->first, 'Gonzo::Schema::Result::User', 'Returned Users via user correleations rs filter.');
 
-my $ranked_user_correlations_rs = $user_correlations_rs->ranked('pearson');
+my $ranked_user_correlations_rs = $user_correlations_rs->ranked_by('pearson');
 
 ok( $ranked_user_correlations_rs, 'Ranked IC resultset fetched.' );
 

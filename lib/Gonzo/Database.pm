@@ -384,11 +384,90 @@ sub recommend_by_item {
     return @items;
 }
 
+=head2 B<similar_users( %hash )>
+
+Recommends similar users. Users are returned in the form of list of User objects or a DBIx::Class::ResultSet of the same, depending on the caller's context (list or scalar).
+
+B<Arguments>:
+
+This method accepts a single hash reference containing the the following key/value pairs.
+
+=over 4
+
+=item B<user (or user_id)>
+Required. The User object (or object ID) representing the user for whom we are recommending similar users.
+
+=item B<similarity>
+Optional. The name of the distance measure to use when calculating similarity. If not present, the default similarity measure is used.
+
+=back
+
+=cut
+
 sub similar_users {
-    my $self            = shift;
-    my $user            = shift;
-    my $similarity_name = shift;
+    my $self = shift;
+    my %args = @_;
+
+    my $user_id = undef;
+    my $schema = $self->get_schema;
+
+    if (defined( $args{user} )) {
+        $user_id = $args{user}->isa('DBIx::Class::Row') ? $args{user}->id : $args{user}->dbix_row->id;
+    }
+    elsif ( defined( $args{user_id} )) {
+        $user_id = $args{user_id};
+    }
+    else {
+        Gonzo::Exception->throw("Your must pass either a 'user' or a 'user_id' to similar_users_rs");
+    }
+
+    my $similarity_type = $args{similarity} || $self->similarity_factory->default || 'pearson';
+
+    return $self->schema->resultset('UserCorrelations')->search({ user_id_one => $user_id })->ranked_by($similarity_type)->users_rs;
 }
+
+=head2 B<similar_items( %hash )>
+
+Recommends similar items to the one passed in via the B<item> or B<item_id> argument. Items are returned in the form of list of Item objects or a DBIx::Class::ResultSet of the same, depending on the caller's context (list or scalar).
+
+B<Arguments>:
+
+This method accepts a hash containing the the following key/value pairs.
+
+=over 4
+
+=item B<item (or item_id)>
+Required. The Item object (or object ID) representing the item as the basis for the similarity search.
+
+=item B<similarity>
+Optional. The name of the distance measure to use when calculating similarity. If not present, the default similarity measure is used.
+
+=back
+
+=cut
+
+sub similar_items {
+    my $self = shift;
+    my %args = @_;
+
+    my $item_id = undef;
+    my $schema = $self->get_schema;
+
+    if (defined( $args{item} )) {
+        $item_id = $args{item}->isa('DBIx::Class::Row') ? $args{item}->id : $args{item}->dbix_row->id;
+    }
+    elsif ( defined( $args{item_id} )) {
+        $item_id = $args{item_id};
+    }
+    else {
+        Gonzo::Exception->throw("Your must pass either a 'item' or a 'item_id' to similar_items");
+    }
+
+    my $similarity_type = $args{similarity} || $self->similarity_factory->default || 'pearson';
+
+    return $self->schema->resultset('ItemCorrelations')->search({ item_id_one => $item_id })->ranked_by($similarity_type)->items_rs;
+}
+
 
 =head2 B<recommend_for_user( $hash_ref )>
 
@@ -465,6 +544,7 @@ sub recommend_for_user {
 
     return @items;
 }
+
 
 =head2 B<rate_item( $hash_ref )>
 
@@ -675,12 +755,7 @@ sub update_user_correlations {
 
 Updates the precalculated correlations for all items.
 
-B<Arguments>:
-
-None
-=over 4
-
-=back
+B<Arguments>: None
 
 =cut
 
@@ -699,6 +774,14 @@ sub update_item_correlations {
     }
     $self->log->debug('Item correlations updated.');
 }
+
+=head2 B<update_all()>
+
+Convenience method for updating all stats and correlation measurements all at once.
+
+B<Arguments>: None
+
+=cut
 
 sub update_all {
     my $self = shift;
