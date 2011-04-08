@@ -128,6 +128,10 @@ sub _build_kioku_dir {
         SQLite::More::sqlite_more( $kioku->backend->schema->storage->dbh );
     }
 
+    if ( $self->bootstrap ) {
+        $kioku->backend->deploy({ add_drop_table => 1});
+    }
+
     $self->log->debug('Database connection inititalized.');
     $self->_kioku_scope( $kioku->new_scope );
     return $kioku;
@@ -629,10 +633,10 @@ sub update_item_statistics {
             my ($storage, $dbh, %args) = @_;
             $dbh->{RaiseError} = 1;
             my $sql = qq|
-                insert into item_statistics (item_id, mean, count)
-                select item_id, sum(rating) / (select count(*) from items) mean, sum(1) count
-                from ratings r
-                group by r.item_id;
+                insert into item_statistics (item_id, mean, count, stddev)
+                select item_id, avg(rating) mean, sum(1) count, stddev(rating)
+                from ratings
+                group by item_id;
             |;
 
             my $sth = $dbh->prepare( $sql ) || die $dbh->errstr;
@@ -640,24 +644,24 @@ sub update_item_statistics {
         },
     );
 
-    my $update_result = $schema->storage->dbh_do( sub {
-            my ($storage, $dbh, %args) = @_;
-            $dbh->{RaiseError} = 1;
-            my $sql = qq|
-                update item_statistics
-                set stddev = (
-                    select sqrt(
-                        sum(ratings.rating * ratings.rating) / (select count(*) from     users) - mean * mean ) stddev
-                    from ratings
-                    where ratings.item_id = item_statistics.item_id
-                    group by ratings.item_id
-                );
-            |;
-
-            my $sth = $dbh->prepare( $sql ) || Gonzo::Exception->throw( $dbh->errstr );
-            $sth->execute() || Gonzo::Exception->throw( $sth->errstr );
-        },
-    );
+#     my $update_result = $schema->storage->dbh_do( sub {
+#             my ($storage, $dbh, %args) = @_;
+#             $dbh->{RaiseError} = 1;
+#             my $sql = qq|
+#                 update item_statistics
+#                 set stddev = (
+#                     select sqrt(
+#                         sum(ratings.rating * ratings.rating) / (select count(*) from     users) - mean * mean ) stddev
+#                     from ratings
+#                     where ratings.item_id = item_statistics.item_id
+#                     group by ratings.item_id
+#                 );
+#             |;
+#
+#             my $sth = $dbh->prepare( $sql ) || Gonzo::Exception->throw( $dbh->errstr );
+#             $sth->execute() || Gonzo::Exception->throw( $sth->errstr );
+#         },
+#     );
 
     $self->log->debug('Item statistics updated.');
 

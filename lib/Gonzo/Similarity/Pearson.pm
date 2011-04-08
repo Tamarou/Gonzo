@@ -57,7 +57,7 @@ sub update_item_correlations {
                 )
                 select sf.item_id_one,
                     sf.item_id_two,
-                    (sf.sum / (select count(*) from users) - stats1.mean * stats2.mean) / (stats1.stddev * stats2.stddev)
+                    (sf.sum / (select count(*) from users) - stats1.mean * stats2.mean) / ((stats1.stddev * stats2.stddev + 0.0001) )
                 from (
                     select  r1.item_id item_id_one,
                         r2.item_id item_id_two,
